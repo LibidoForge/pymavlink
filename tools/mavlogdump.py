@@ -15,6 +15,8 @@ import os
 import struct
 import sys
 import time
+from datetime import datetime
+import random
 
 # Detect python version
 if sys.version_info[0] < 3:
@@ -60,6 +62,8 @@ parser.add_argument("--reduce-rate", type=float, default=0, help="reduce message
 parser.add_argument("log", metavar="LOG")
 parser.add_argument("--profile", action='store_true', help="run the Yappi python profiler")
 parser.add_argument("--meta", action='store_true', help="output meta-data msgs even if not matching condition")
+parser.add_argument("--obfuscate", action='store_true', help="remove positioning information")
+parser.add_argument("--obfuscate-shift", type=int, default=0, help="shift positioning information")
 
 args = parser.parse_args()
 
@@ -70,6 +74,9 @@ import inspect
 
 from pymavlink import mavutil
 
+# create random float for obfuscation
+random.seed(int(datetime.now().strftime("%f")))
+rand = random.random()
 
 if args.profile:
     import yappi    # We do the import here so that we won't barf if run normally and yappi not available
@@ -308,11 +315,22 @@ while True:
 
         # Prepare the message as a single object with 'meta' and 'data' keys holding
         # the message's metadata and actual data respectively.
-        meta = {"type": m_type, "timestamp": timestamp}
+        # Add datetime
+        meta = {"type": m_type, "timestamp": timestamp, "datetime": datetime.fromtimestamp(timestamp).strftime("%Y-%m-%dT%H:%M:%S:%f")}
         if args.show_source:
             meta["srcSystem"] = m.get_srcSystem()
             meta["srcComponent"] = m.get_srcComponent()
-
+       
+        # remove lat|lng (obfuscate)
+        # TODO: just shift location
+        if args.obfuscate:
+            if "Lng" in data:
+                if args.obfuscate_shift: data["Lng"] += args.obfuscate_shift + rand
+                else: data["Lng"] = ""
+            if "Lat" in data:
+                if args.obfuscate_shift: data["Lat"] += args.obfuscate_shift + rand
+                else: data["Lat"] = ""
+                
         # convert any array.array (e.g. packed-16-bit fft readings) into lists:
         for key in data.keys():
             if type(data[key]) == array.array:
@@ -322,7 +340,7 @@ while True:
             if type(data[key]) == bytes:
                 data[key] = to_string(data[key])
         outMsg = {"meta": meta, "data": data}
-
+            
         # Now print out this object with stringified properly.
         print(json.dumps(outMsg))
 
