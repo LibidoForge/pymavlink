@@ -64,6 +64,7 @@ parser.add_argument("--profile", action='store_true', help="run the Yappi python
 parser.add_argument("--meta", action='store_true', help="output meta-data msgs even if not matching condition")
 parser.add_argument("--obfuscate", action='store_true', help="remove positioning information")
 parser.add_argument("--obfuscate-shift", type=int, default=0, help="shift positioning information")
+parser.add_argument("--datetime", action='store_true', help="add datetime field")
 
 args = parser.parse_args()
 
@@ -315,8 +316,9 @@ while True:
 
         # Prepare the message as a single object with 'meta' and 'data' keys holding
         # the message's metadata and actual data respectively.
-        # Add datetime
-        meta = {"type": m_type, "timestamp": timestamp, "datetime": datetime.fromtimestamp(timestamp).strftime("%Y-%m-%dT%H:%M:%S:%f")}
+        if args.datetime: meta = {"type": m_type, "timestamp": timestamp, "datetime": datetime.fromtimestamp(timestamp).strftime("%Y-%m-%dT%H:%M:%S:%f")}
+        else: meta = {"type": m_type, "timestamp": timestamp}
+            
         if args.show_source:
             meta["srcSystem"] = m.get_srcSystem()
             meta["srcComponent"] = m.get_srcComponent()
