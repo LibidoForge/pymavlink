@@ -38,6 +38,8 @@ def process(filename):
     file_header = bytearray()
 
     messages = []
+    in_air = False
+    start_time = 0.0
 
     # dictionary of outputs by sysid
     output = {}
