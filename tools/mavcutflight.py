@@ -38,11 +38,10 @@ def process(filename):
 
     file_header = bytearray()
 
-    messages = []
     takeoff = False
-    start_time = 0.0
     last_curr_up = 0
     last_curr = 0
+    mission = 1
 
     # dictionary of outputs by sysid
     output = {}
@@ -54,17 +53,6 @@ def process(filename):
 
         if args.condition and not mavutil.evaluate_condition(args.condition, mlog.messages):
             continue
-
-        m = mlog.recv_match(type=['SYS_STATUS','STATUSTEXT'], condition=args.condition)
-        if groundspeed > args.groundspeed and not in_air:
-            print("In air at %s (percent %.0f%% groundspeed %.1f)" % (time.asctime(t), mlog.percent, groundspeed))
-            in_air = True
-            start_time = time.mktime(t)
-        elif groundspeed < args.groundspeed and in_air:
-            print("On ground at %s (percent %.1f%% groundspeed %.1f  time=%.1f seconds)" % (
-                time.asctime(t), mlog.percent, groundspeed, time.mktime(t) - start_time))
-            in_air = False
-            total_time += time.mktime(t) - start_time
         
         # power consumption
         if takeoff == 0 and m.get_type() == "SYS_STATUS":
@@ -77,13 +65,13 @@ def process(filename):
             takeoff = 1
             
         # Takeoff message
-        if takeoff == 0 and m.get_type() == "STATUSTEXT" and re.match(r".*takeoff.*", str(m.Text), re.I):
+        if takeoff == 0 and m.get_type() == "STATUSTEXT" and re.match(r".*takeoff.*", str(m.text), re.I):
             takeoff = 1
 
         # Skip pre
         if takeoff == 0: continue
             
-        # power consumption
+        # Power consumption
         if takeoff == 1 and m.get_type() == "SYS_STATUS":
             if int(m.current_battery)*0.01 < 5: last_curr += 1
             else: last_curr = 0
@@ -92,18 +80,22 @@ def process(filename):
         if takeoff == 1 and last_curr >= 5:				
             last_curr = 0
             takeoff = 0
+            mission += 1
             continue
 
+        # Write file
         sysid = m.get_srcSystem()
-        if not sysid in output:
-            fname = "%s-%u.%s" % (base, sysid, extension)
+        if not mission in output:
+            # fname = "%s-%u.mission.%s" % (base, sysid, extension)
+            fname = "%s%s.%u.mission.%s" % (base, ext, mission, extension)
             print("Creating %s" % fname)
-            output[sysid] = open(fname, mode='wb')
+            output[mission] = open(fname, mode='wb')
 
-        if output[sysid] and m.get_type() != 'BAD_DATA':
+        #
+        if output[mission] and m.get_type() != 'BAD_DATA':
             timestamp = getattr(m, '_timestamp', None)
-            output[sysid].write(struct.pack('>Q', int(timestamp*1.0e6)))
-            output[sysid].write(m.get_msgbuf())
+            output[mission].write(struct.pack('>Q', int(timestamp*1.0e6)))
+            output[mission].write(m.get_msgbuf())
 
 for filename in args.logs:
     process(filename)
